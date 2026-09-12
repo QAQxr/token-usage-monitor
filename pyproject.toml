@@ -1,0 +1,9 @@
+[project]
+name = "token-usage-monitor"
+version = "0.1.0"
+description = "Read-only local Codex token and usage monitor"
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.tokenwatch]
+session_root = "/home/o_o/.codex/sessions"
