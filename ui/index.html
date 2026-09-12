@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Token Usage Monitor</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">CODEX OBSERVABILITY</p>
+          <h1>Token Usage Monitor</h1>
+        </div>
+        <div id="status" class="status">Waiting for data</div>
+      </header>
+
+      <section id="cards" class="cards"></section>
+
+      <section class="panel">
+        <div class="panel-title"><h2>Token Distribution</h2><span>exact / estimated / unknown</span></div>
+        <div id="distribution" class="distribution"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title"><h2>Turns</h2><span id="source"></span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Turn</th><th>Requests</th><th>Input</th><th>Cached</th><th>Output</th><th>Latency</th></tr></thead>
+            <tbody id="turns"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>
