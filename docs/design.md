@@ -22,7 +22,7 @@ rollout JSONL / App Server events
    Turn metrics   Session metrics
              |
              v
-       CLI / HTTP JSON / dashboard
+       CLI / HTTP JSON / PySide6 desktop / dashboard
 ```
 
 ### Raw source layer
@@ -44,6 +44,10 @@ Every distribution bucket carries a quality label:
 ### UI layer
 
 The local dashboard polls a loopback-only JSON endpoint. The endpoint creates a fresh store from the newest rollout file for each request, keeping the UI stateless and making file rotation safe. A future App Server client can replace the source without changing the HTML.
+
+The PySide6 desktop layer uses the same source-to-metrics pipeline through `SnapshotRefresher`. `SnapshotRefresher` converts a successful load, missing data, stale files, and parser exceptions into explicit `MonitorState` values. The Qt window only selects the newest Session or Turn snapshot, formats values, and schedules a `QTimer` refresh; it does not parse JSONL or calculate metrics.
+
+The desktop window is a compact, frameless, always-on-top `QTool` window. Its header is the drag target, the close button is independent, and the Session/Current Turn selector changes presentation scope without changing the underlying store. PySide6 remains an optional dependency so the existing standard-library CLI and HTTP dashboard are not polluted.
 
 ## Metrics
 

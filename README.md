@@ -26,6 +26,15 @@ python3 -m tokenwatch --serve --port 8765
 
 Then open `http://127.0.0.1:8765/` in a browser. The server is opt-in and is not started automatically.
 
+Run the optional PySide6 desktop window:
+
+```bash
+python3 -m pip install -e '.[gui]'
+python3 -m tokenwatch --gui
+```
+
+The desktop window is read-only, always on top, draggable from its header, independently closable, and refreshes the newest rollout file on a timer. PySide6 is intentionally optional, so the existing CLI and HTTP dashboard remain standard-library-only.
+
 ## Development
 
 The project uses only the Python standard library in the MVP:
@@ -33,6 +42,8 @@ The project uses only the Python standard library in the MVP:
 ```bash
 python3 -m unittest discover -s tests -v
 ```
+
+The GUI refresh/state layer is tested without requiring a Qt installation. A real desktop launch requires the optional `gui` extra above.
 
 ## Data and limitations
 

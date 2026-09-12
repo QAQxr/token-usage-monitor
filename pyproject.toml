@@ -5,5 +5,8 @@ description = "Read-only local Codex token and usage monitor"
 requires-python = ">=3.10"
 dependencies = []
 
+[project.optional-dependencies]
+gui = ["PySide6>=6.7,<7"]
+
 [tool.tokenwatch]
 session_root = "/home/o_o/.codex/sessions"

@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 from .dashboard import serve
+from .gui import GuiUnavailableError, run_gui
 from .pipeline import DEFAULT_SESSION_ROOT, load_newest_store
 
 
@@ -53,11 +54,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--json", action="store_true", dest="as_json")
     parser.add_argument("--serve", action="store_true")
+    parser.add_argument("--gui", action="store_true", help="run the optional PySide6 desktop window")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--interval", type=float, default=1.0)
     args = parser.parse_args(argv)
 
+    if args.gui:
+        try:
+            return run_gui(str(args.root), args.interval)
+        except GuiUnavailableError as exc:
+            print(f"GUI unavailable: {exc}")
+            return 2
     if args.serve:
         serve(args.host, args.port, args.root)
         return 0
