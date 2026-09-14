@@ -12,7 +12,7 @@
 - 第一次绑定全量读取，之后只读取 JSONL 新增字节；文件替换或 truncate 会安全重建。
 - `REQ` 定义为当前 rollout 中有效 `token_count` usage snapshot 数量。
 - GTK3 纯文字窗口，内容固定 12 行；正常态只替换数字和进度条。
-- X11 下首次显示时默认贴在 Codex 右侧；之后不再因 Codex 移动、缩放或最大化重新定位，用户拖到哪里就保持在哪里；显示后设置全局置顶，但只设置一次；最小化时隐藏。
+- X11 下首次显示时默认贴在 Codex 右侧；之后不再因 Codex 移动、缩放或最大化重新定位，用户拖到哪里就保持在哪里；窗口使用普通层级，不全局置顶；最小化时隐藏。
 
 ## 启动
 
@@ -33,6 +33,13 @@ python3 -m tokenwatch --companion
 `scripts/tokenwatch.desktop` 是对应的用户级启动器；它不会修改系统级
 桌面文件。TokenWatch 带有用户级单实例锁，重复点击不会创建多个窗口。
 
+TokenWatch 也可以由用户级 systemd 服务在登录后自动启动：
+
+```bash
+systemctl --user status tokenwatch.service
+journalctl --user -u tokenwatch.service -f
+```
+
 `--gui` 仍作为同义入口保留：
 
 ```bash
@@ -49,7 +56,7 @@ sed -i 's#^Exec=/home/o_o/.local/bin/chatgpt-proxy %U#Exec=/home/o_o/.local/bin/
 update-desktop-database ~/.local/share/applications 2>/dev/null || true
 ```
 
-安装后完全退出并重新打开 Codex，再运行 `python3 -m tokenwatch --companion`。
+安装后完全退出并重新打开 Codex；TokenWatch 服务会在后台等待并自动连接。
 
 ## 离线验证
 

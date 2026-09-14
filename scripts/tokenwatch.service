@@ -1,0 +1,18 @@
+[Unit]
+Description=TokenWatch Codex companion
+After=graphical-session.target
+Wants=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/home/o_o/codex/projects/token-usage-monitor/scripts/tokenwatch
+Restart=on-failure
+RestartSec=2
+Environment=DISPLAY=:0
+Environment=GDK_BACKEND=x11
+Environment=PYTHONUNBUFFERED=1
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

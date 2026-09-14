@@ -28,10 +28,14 @@ Codex schema. `Session` cache hit is cumulative cached input divided by
 cumulative input; `Last` cache hit uses the latest snapshot; `Context` uses
 latest input divided by the model context window.
 
-The GTK window is independent from Codex. Under X11, it uses a normal utility
-window with GTK's keep-above hint applied once after mapping, so it stays above
-all applications without repeated restacking. The initial placement is to the
-right of Codex, or inside the upper-right area when Codex is already maximized;
-after that first placement, the user's manual position is kept as an absolute
-desktop coordinate. Codex movement, resizing, and maximize changes do not
-reposition the companion. It only hides when Codex is minimized or unavailable.
+The GTK window is independent from Codex and uses a normal utility window
+without a keep-above hint. The initial placement is to the right of Codex, or
+inside the upper-right area when Codex is already maximized; after that first
+placement, the user's manual position is kept as an absolute desktop
+coordinate. Codex movement, resizing, and maximize changes do not reposition
+the companion. It only hides when Codex is minimized or unavailable.
+
+The user-level `tokenwatch.service` keeps one companion process alive after
+login, waits while Codex is unavailable, and restarts it after an abnormal
+exit. The GUI and data polling remain in one lightweight process protected by
+the runtime-directory instance lock.
