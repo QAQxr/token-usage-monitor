@@ -1,66 +1,37 @@
-# MVP design
-
-## Goals
-
-1. Read-only collection from an existing Codex data source.
-2. Correct exact accounting where the source provides usage fields.
-3. Explicit quality states for estimated or unavailable metrics.
-4. Turn and Session aggregation with one reusable metric engine.
-5. A compact local UI that can be replaced without changing collection.
-
-## Layers
+# TokenWatch MVP design
 
 ```text
-rollout JSONL / App Server events
-             |
-             v
-       normalized events
-             |
-             v
-       MetricsStore
-       /          \
-   Turn metrics   Session metrics
-             |
-             v
-       CLI / HTTP JSON / PySide6 desktop / dashboard
+Codex GUI
+   │  loopback CDP: current thread UUID
+   ▼
+SessionIndex ── exact UUID → rollout JSONL
+   │
+   ▼
+IncrementalRolloutReader ── latest token_count snapshot
+   │
+   ├── fixed-width text renderer
+   └── GTK3 + X11 companion window
 ```
 
-### Raw source layer
+CDP is used only to identify the currently viewed GUI thread. The rollout
+reader is read-only and never treats the newest file as a substitute for a
+missing thread mapping. If the renderer returns equally strong candidates,
+the companion stays hidden.
 
-`tokenwatch.sources.jsonl.RolloutJsonlSource` reads complete files or appended lines. It normalizes only metadata needed by the metrics engine and ignores sensitive content.
+The JSONL reader replays a selected file once, then remembers its byte offset
+and consumes only complete appended lines. File replacement and truncation
+reset the selected file safely.
 
-### Metrics layer
+`REQ` is the number of valid `token_count` events in the selected rollout.
+Those are the only direct per-request usage snapshots observed in the local
+Codex schema. `Session` cache hit is cumulative cached input divided by
+cumulative input; `Last` cache hit uses the latest snapshot; `Context` uses
+latest input divided by the model context window.
 
-`MetricsStore` consumes normalized events. It deduplicates by source sequence, maintains Turn state, and derives Session totals from Turn state. It never reads files directly.
-
-### Quality model
-
-Every distribution bucket carries a quality label:
-
-- `exact`: supplied by the provider usage payload.
-- `estimated`: derived from visible text using a documented heuristic.
-- `unknown`: the source does not expose a reliable value.
-
-### UI layer
-
-The local dashboard polls a loopback-only JSON endpoint. The endpoint creates a fresh store from the newest rollout file for each request, keeping the UI stateless and making file rotation safe. A future App Server client can replace the source without changing the HTML.
-
-The PySide6 desktop layer uses the same source-to-metrics pipeline through `SnapshotRefresher`. `SnapshotRefresher` converts a successful load, missing data, stale files, and parser exceptions into explicit `MonitorState` values. The Qt window only selects the newest Session or Turn snapshot, formats values, and schedules a `QTimer` refresh; it does not parse JSONL or calculate metrics.
-
-The desktop window is a compact, frameless, always-on-top `QTool` window. Its header is the drag target, the close button is independent, and the Session/Current Turn selector changes presentation scope without changing the underlying store. PySide6 remains an optional dependency so the existing standard-library CLI and HTTP dashboard are not polluted.
-
-## Metrics
-
-- `Total Tokens`: sum of exact per-request total tokens.
-- `Request Count`: number of unique token-usage events.
-- `Turn Count`: observed `task_started` boundaries.
-- `Input`, `Cached`, `Output`: sums of exact latest-request usage.
-- `Cache Hit %`: cached input divided by input, when input is nonzero.
-- `Latency`: turn start to turn completion when both boundaries exist.
-- `TTFT`: first observed agent-message delta minus turn start; otherwise `unknown`.
-- `TPS`: output tokens divided by generation duration when TTFT and completion timestamps exist; otherwise `unknown`.
-- `Cost`: calculated only when an explicit price table is supplied; no price is guessed.
-
-## First commit boundary
-
-The initial commit contains this design and source investigation. Subsequent commits will separate the data model/source, metric engine/tests, and UI.
+The GTK window is independent from Codex. Under X11, it uses a normal utility
+window with GTK's keep-above hint applied once after mapping, so it stays above
+all applications without repeated restacking. The initial placement is to the
+right of Codex, or inside the upper-right area when Codex is already maximized;
+after that first placement, the user's manual position is kept as an absolute
+desktop coordinate. Codex movement, resizing, and maximize changes do not
+reposition the companion. It only hides when Codex is minimized or unavailable.

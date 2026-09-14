@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=TokenWatch
+Comment=Codex token usage companion
+Exec=/home/o_o/codex/projects/token-usage-monitor/scripts/tokenwatch
+Icon=utilities-system-monitor
+Type=Application
+Terminal=false
+StartupNotify=true
+StartupWMClass=TokenWatch
+Path=/home/o_o/codex/projects/token-usage-monitor
+Categories=Utility;

@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+
+PROJECT_DIR=/home/o_o/codex/projects/token-usage-monitor
+cd "$PROJECT_DIR"
+
+# A desktop launcher has no terminal; run the GTK companion as a normal app.
+exec /usr/bin/python3 -m tokenwatch --companion

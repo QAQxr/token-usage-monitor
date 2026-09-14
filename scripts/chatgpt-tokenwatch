@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+# Keep the user's existing proxy/auth wrapper and add only loopback CDP.
+exec /home/o_o/.local/bin/chatgpt-proxy \
+    --ozone-platform=x11 \
+    --remote-debugging-address=127.0.0.1 \
+    --remote-debugging-port=9222 \
+    "$@"

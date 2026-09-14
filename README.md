@@ -1,50 +1,87 @@
-# Token Usage Monitor
+# TokenWatch
 
-A small, read-only Codex usage monitor with a TokenWatch-style dashboard.
+这是一个只面向 Ubuntu 22.04 + Codex GUI 的本地只读 TokenWatch MVP。
 
-The MVP reads Codex rollout JSONL records from the local Codex data directory. It keeps raw event parsing separate from metric aggregation and exposes both a CLI snapshot and a local HTTP dashboard. It does not modify Codex, write to session logs, or require third-party packages.
+它不会修改 Codex、`auth.json` 或 `~/.codex/sessions`，也不会联网。Codex 和 TokenWatch 可以分别启动；TokenWatch 只在同时发现 Codex GUI、loopback CDP 和当前 rollout 时显示窗口。
 
-## Quick start
+## 当前实现
 
-Show one snapshot from the newest Codex session:
+- `127.0.0.1:9222/json/list` 发现 `app://-/index.html` 主 renderer。
+- 通过 location、history state 和活动 DOM 候选读取当前 thread UUID；候选不唯一时不猜。
+- 通过 rollout 文件名和 `session_meta` UUID 映射到 `~/.codex/sessions/**/*.jsonl`；同一 thread 的多份 rollout 使用最新一份。
+- 第一次绑定全量读取，之后只读取 JSONL 新增字节；文件替换或 truncate 会安全重建。
+- `REQ` 定义为当前 rollout 中有效 `token_count` usage snapshot 数量。
+- GTK3 纯文字窗口，内容固定 12 行；正常态只替换数字和进度条。
+- X11 下首次显示时默认贴在 Codex 右侧；之后不再因 Codex 移动、缩放或最大化重新定位，用户拖到哪里就保持在哪里；显示后设置全局置顶，但只设置一次；最小化时隐藏。
+
+## 启动
+
+先直接运行一次探针：
 
 ```bash
-python3 -m tokenwatch --once
+cd ~/codex/projects/token-usage-monitor
+python3 -m tokenwatch --probe
 ```
 
-Run the compact terminal monitor:
+启动 TokenWatch 窗口：
 
 ```bash
-python3 -m tokenwatch
+python3 -m tokenwatch --companion
 ```
 
-Run the local dashboard on loopback only:
+也可以从应用菜单启动 `TokenWatch`，不需要打开终端。项目内的
+`scripts/tokenwatch.desktop` 是对应的用户级启动器；它不会修改系统级
+桌面文件。TokenWatch 带有用户级单实例锁，重复点击不会创建多个窗口。
+
+`--gui` 仍作为同义入口保留：
 
 ```bash
-python3 -m tokenwatch --serve --port 8765
-```
-
-Then open `http://127.0.0.1:8765/` in a browser. The server is opt-in and is not started automatically.
-
-Run the optional PySide6 desktop window:
-
-```bash
-python3 -m pip install -e '.[gui]'
 python3 -m tokenwatch --gui
 ```
 
-The desktop window is read-only, always on top, draggable from its header, independently closable, and refreshes the newest rollout file on a timer. PySide6 is intentionally optional, so the existing CLI and HTTP dashboard remain standard-library-only.
+当 Codex 没有用 `--remote-debugging-address=127.0.0.1 --remote-debugging-port=9222` 启动时，窗口会保持隐藏。
 
-## Development
+如果要让应用菜单里的 Codex 默认带上这些参数，可安装项目里的用户级启动包装器：
 
-The project uses only the Python standard library in the MVP:
+```bash
+install -Dm755 scripts/chatgpt-tokenwatch ~/.local/bin/chatgpt-tokenwatch
+sed -i 's#^Exec=/home/o_o/.local/bin/chatgpt-proxy %U#Exec=/home/o_o/.local/bin/chatgpt-tokenwatch %U#' ~/.local/share/applications/chatgpt.desktop
+update-desktop-database ~/.local/share/applications 2>/dev/null || true
+```
+
+安装后完全退出并重新打开 Codex，再运行 `python3 -m tokenwatch --companion`。
+
+## 离线验证
+
+按 thread UUID 渲染某个真实 rollout：
+
+```bash
+python3 -m tokenwatch --render-thread THREAD_UUID
+```
+
+运行完整测试：
 
 ```bash
 python3 -m unittest discover -s tests -v
 ```
 
-The GUI refresh/state layer is tested without requiring a Qt installation. A real desktop launch requires the optional `gui` extra above.
+测试包含 A→B→C→A 的精确映射、歧义拒绝、增量读取和固定布局检查。真实 GUI A→B→C→A 验收需要 Codex 实例实际暴露 9222；当前 MVP 不会把 CDP 不可用误判成某个 rollout。
 
-## Data and limitations
+## 固定 UI
 
-See [docs/data-sources.md](docs/data-sources.md), [docs/design.md](docs/design.md), and [docs/limitations.md](docs/limitations.md).
+```text
+╭──────────────────────────────╮
+│ ▼ TokenWatch      94.70% HIT │
+├──────────────────────────────┤
+│ 3.89M   12     3.83M     60K │
+│ TOTAL   REQ    INPUT     OUT │
+│                              │
+│ Session ██████████████ 91.90%│
+│ Last    ██████████████ 94.70%│
+│                              │
+│ Context █████░░░░░░░░  33.40%│
+│                86.2K / 258K│
+│                              │
+│ 5h 10.00%          7d  4.00% │
+╰──────────────────────────────╯
+```
