@@ -98,6 +98,7 @@ class CompanionApp:
         self.thread_id: str | None = None
         self.rollout: Path | None = None
         self.window_xid: int | None = None
+        self._global_above_applied = False
         self._placement_initialized = False
         self._last_programmatic_position: tuple[int, int] | None = None
         self.tick_count = 0
@@ -154,6 +155,11 @@ class CompanionApp:
             self._set_status("TokenWatch: GTK is not using X11; set GDK_BACKEND=x11")
             return False
         self.window_xid = get_xid()
+        # Default behavior: stay above all applications.  Apply the hint only
+        # once after mapping so refreshes do not repeatedly restack the window.
+        if not self._global_above_applied:
+            self.window.set_keep_above(True)
+            self._global_above_applied = True
         if not self._placement_initialized:
             width, height = self.window.get_size()
             if parent.maximized:

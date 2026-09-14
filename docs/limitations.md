@@ -7,8 +7,8 @@
   detail of the local Codex GUI, not a public contract. The probe therefore
   ranks several observable candidates and refuses ambiguous results.
 - X11 attachment is implemented for the user's Ubuntu X11/XWayland setup;
-  Wayland-native window management is outside this MVP. The companion uses
-  normal window stacking; user-controlled desktop pinning is outside the app.
+  Wayland-native window management is outside this MVP. The companion is
+  globally always-on-top by default.
 - `REQ` counts valid `token_count` snapshots, which is the observable local
   per-request event. It is not inferred from tool-call count or JSONL line
   count.

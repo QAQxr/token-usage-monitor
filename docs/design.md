@@ -28,9 +28,10 @@ Codex schema. `Session` cache hit is cumulative cached input divided by
 cumulative input; `Last` cache hit uses the latest snapshot; `Context` uses
 latest input divided by the model context window.
 
-The GTK window is independent from Codex and uses a normal utility window
-without a keep-above hint. The initial placement is to the right of Codex, or
-inside the upper-right area when Codex is already maximized; after that first
+The GTK window is independent from Codex and uses a utility window with a
+keep-above hint applied once after mapping, so it is globally on top without
+repeated restacking. The initial placement is to the right of Codex, or inside
+the upper-right area when Codex is already maximized; after that first
 placement, the user's manual position is kept as an absolute desktop
 coordinate. Codex movement, resizing, and maximize changes do not reposition
 the companion. It only hides when Codex is minimized or unavailable.
