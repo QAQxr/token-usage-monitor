@@ -343,6 +343,9 @@ class UsageSnapshot:
     primary_used_percent: float | None
     secondary_used_percent: float | None
     request_count: int
+    # Cache-hit fields are only authoritative while the current Codex Work
+    # route is available.  Quota fields remain useful when it is not.
+    cache_available: bool = True
 
 
 class UsageAccumulator:

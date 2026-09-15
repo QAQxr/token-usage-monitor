@@ -41,9 +41,9 @@ def compact_count(value: int | float | None, max_width: int | None = None) -> st
     return text
 
 
-def percent(value: float | None) -> str:
+def percent(value: float | None, placeholder: str = "—") -> str:
     if value is None:
-        return "—"
+        return placeholder
     return f"{max(0.0, min(100.0, float(value))):.2f}%"
 
 
@@ -69,8 +69,8 @@ def _fit(text: str, width: int = INNER_WIDTH) -> str:
     return text[:width].ljust(width)
 
 
-def _bar_line(label: str, value: float | None) -> str:
-    value_text = percent(value)
+def _bar_line(label: str, value: float | None, placeholder: str = "—") -> str:
+    value_text = percent(value, placeholder)
     if len(value_text) > 6:
         # Keep the full 100.00% inside the fixed-width line.
         return _fit(f" {label:<7} {_bar(value)}{value_text:>7}")
@@ -135,10 +135,14 @@ def _data_markup(snapshot: UsageSnapshot) -> str:
 
 
 def render_lines(snapshot: UsageSnapshot) -> tuple[str, ...]:
-    session_hit = _ratio(snapshot.total.cached_input_tokens, snapshot.total.input_tokens)
-    last_hit = _ratio(snapshot.last.cached_input_tokens, snapshot.last.input_tokens)
+    session_hit = (
+        _ratio(snapshot.total.cached_input_tokens, snapshot.total.input_tokens)
+        if snapshot.cache_available
+        else None
+    )
+    last_hit = _ratio(snapshot.last.cached_input_tokens, snapshot.last.input_tokens) if snapshot.cache_available else None
     context = _ratio(snapshot.last.input_tokens, snapshot.context_window or 0)
-    header_right = f"{percent(last_hit):>5} HIT "
+    header_right = f"{percent(last_hit, '-'):>5} HIT "
     header_left = " ▼ TokenWatch"
     header = header_left + " " * max(1, INNER_WIDTH - len(header_left) - len(header_right)) + header_right
     context_values = f"{compact_count(snapshot.last.input_tokens)} / {compact_count(snapshot.context_window)}"
@@ -156,8 +160,8 @@ def render_lines(snapshot: UsageSnapshot) -> tuple[str, ...]:
         "│" + _data_line(snapshot) + "│",
         "│" + _fit(" TOTAL   REQ    INPUT     OUT ") + "│",
         "│" + " " * INNER_WIDTH + "│",
-        "│" + _bar_line("Session", session_hit) + "│",
-        "│" + _bar_line("Last", last_hit) + "│",
+        "│" + _bar_line("Session", session_hit, "-") + "│",
+        "│" + _bar_line("Last", last_hit, "-") + "│",
         "│" + _bar_line("Context", context) + "│",
         "│" + _fit(context_values.rjust(INNER_WIDTH)) + "│",
         "│" + _fit(bottom) + "│",
@@ -165,9 +169,9 @@ def render_lines(snapshot: UsageSnapshot) -> tuple[str, ...]:
     )
 
 
-def _bar_markup(label: str, value: float | None) -> str:
-    line = _bar_line(label, value)
-    value_text = percent(value)
+def _bar_markup(label: str, value: float | None, placeholder: str = "—") -> str:
+    line = _bar_line(label, value, placeholder)
+    value_text = percent(value, placeholder)
     if len(value_text) > 6:
         prefix = f" {label:<7} {_bar(value)}"
         start = len(prefix) + max(0, 7 - len(value_text))
@@ -179,14 +183,18 @@ def _bar_markup(label: str, value: float | None) -> str:
 
 def render_markup(snapshot: UsageSnapshot) -> str:
     """Render the same layout with dark/bold spans around dynamic numbers."""
-    session_hit = _ratio(snapshot.total.cached_input_tokens, snapshot.total.input_tokens)
-    last_hit = _ratio(snapshot.last.cached_input_tokens, snapshot.last.input_tokens)
+    session_hit = (
+        _ratio(snapshot.total.cached_input_tokens, snapshot.total.input_tokens)
+        if snapshot.cache_available
+        else None
+    )
+    last_hit = _ratio(snapshot.last.cached_input_tokens, snapshot.last.input_tokens) if snapshot.cache_available else None
     context = _ratio(snapshot.last.input_tokens, snapshot.context_window or 0)
-    header_right = f"{percent(last_hit):>5} HIT "
+    header_right = f"{percent(last_hit, '-'):>5} HIT "
     header_left = " ▼ TokenWatch"
     header = header_left + " " * max(1, INNER_WIDTH - len(header_left) - len(header_right)) + header_right
     header = _fit(header)
-    header_value_start = header.rfind(percent(last_hit))
+    header_value_start = header.rfind(percent(last_hit, "-"))
 
     context_total = compact_count(snapshot.last.input_tokens)
     context_window = compact_count(snapshot.context_window)
@@ -207,13 +215,13 @@ def render_markup(snapshot: UsageSnapshot) -> str:
     return "\n".join(
         (
             "╭" + "─" * INNER_WIDTH + "╮",
-            "│" + _styled_line(header, ((header_value_start, header_value_start + len(percent(last_hit))),)) + "│",
+            "│" + _styled_line(header, ((header_value_start, header_value_start + len(percent(last_hit, "-"))),)) + "│",
             "├" + "─" * INNER_WIDTH + "┤",
             "│" + _data_markup(snapshot) + "│",
             "│" + _fit(" TOTAL   REQ    INPUT     OUT ") + "│",
             "│" + " " * INNER_WIDTH + "│",
-            "│" + _bar_markup("Session", session_hit) + "│",
-            "│" + _bar_markup("Last", last_hit) + "│",
+            "│" + _bar_markup("Session", session_hit, "-") + "│",
+            "│" + _bar_markup("Last", last_hit, "-") + "│",
             "│" + _bar_markup("Context", context) + "│",
             "│" + _styled_line(context_line, context_spans) + "│",
             "│" + _styled_line(bottom, bottom_spans) + "│",

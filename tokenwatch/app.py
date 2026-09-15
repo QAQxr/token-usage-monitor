@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from .codex import CdpClient, IncrementalRolloutReader, SessionIndex, ThreadProbe
+from .codex import CdpClient, IncrementalRolloutReader, SessionIndex, ThreadProbe, TokenUsage, UsageSnapshot
 from .render import render, render_markup, validate_layout
 from .x11 import find_codex_window
 
@@ -46,6 +46,20 @@ def render_for_thread(root: str | Path, thread_id: str) -> str | None:
     reader = IncrementalRolloutReader()
     snapshot = reader.switch(path)
     return render(snapshot) if snapshot else None
+
+
+def _empty_snapshot() -> UsageSnapshot:
+    """Provide a stable display before Codex exposes a Work snapshot."""
+    empty = TokenUsage()
+    return UsageSnapshot(
+        total=empty,
+        last=empty,
+        context_window=None,
+        primary_used_percent=None,
+        secondary_used_percent=None,
+        request_count=0,
+        cache_available=False,
+    )
 
 
 class GtkUnavailableError(RuntimeError):
@@ -101,6 +115,7 @@ class CompanionApp:
         self._global_above_applied = False
         self._placement_initialized = False
         self._last_programmatic_position: tuple[int, int] | None = None
+        self._last_snapshot: UsageSnapshot | None = None
         self.tick_count = 0
         self._status = ""
 
@@ -136,22 +151,18 @@ class CompanionApp:
             return False
         return False
 
-    def _show_attached(self, parent: Any | None = None) -> bool:
-        parent = parent or find_codex_window()
-        if parent is None or parent.minimized:
-            self.window.hide()
-            return False
+    def _map_window(self) -> bool:
         # Mapping an already-visible window on every timer tick can cause
         # some WMs to restack it above the active application.  Only map it
         # when transitioning from hidden to visible.
-        if not self.window.get_visible():
+        newly_visible = not self.window.get_visible()
+        if newly_visible:
             self.window.show_all()
         child = self.window.get_window()
         if child is None:
             return False
         get_xid = getattr(child, "get_xid", None)
         if get_xid is None:
-            self.window.hide()
             self._set_status("TokenWatch: GTK is not using X11; set GDK_BACKEND=x11")
             return False
         self.window_xid = get_xid()
@@ -160,18 +171,46 @@ class CompanionApp:
         if not self._global_above_applied:
             self.window.set_keep_above(True)
             self._global_above_applied = True
+        if newly_visible:
+            # Some WMs apply the ABOVE hint one event-loop turn after mapping.
+            # Reassert it once after mapping and raise without stealing focus;
+            # normal refreshes never restack the window.
+            self.GLib.idle_add(self._settle_initial_stack)
+        return True
+
+    def _settle_initial_stack(self) -> bool:
+        if not self.window.get_visible():
+            return False
+        self.window.set_keep_above(True)
+        child = self.window.get_window()
+        raise_window = getattr(child, "raise_", None) if child is not None else None
+        if callable(raise_window):
+            raise_window()
+        return False
+
+    def _show_attached(self, parent: Any | None = None) -> bool:
+        """Keep the panel visible; use Codex only for its first placement."""
+        parent = parent or find_codex_window()
+        if not self._map_window():
+            return False
         if not self._placement_initialized:
             width, height = self.window.get_size()
-            if parent.maximized:
+            if parent is not None and parent.maximized:
                 default_x = parent.x + parent.width - width - 10
                 default_y = parent.y + 10
-            else:
+            elif parent is not None:
                 default_x = parent.x + parent.width + 8
                 default_y = parent.y + 8
+            else:
+                # The panel is independent of Codex. If Codex is not a Work
+                # window yet, give it a deterministic initial position and
+                # leave it there for the user to move.
+                default_x = 32
+                default_y = 32
             screen = self.Gdk.Screen.get_default()
             x, y = default_x, default_y
             if screen is not None:
-                monitor = screen.get_monitor_at_point(parent.x, parent.y)
+                monitor = screen.get_monitor_at_point(default_x, default_y)
                 geometry = screen.get_monitor_geometry(monitor)
                 x = max(geometry.x, min(x, geometry.x + geometry.width - width))
                 y = max(geometry.y, min(y, geometry.y + geometry.height - height))
@@ -181,9 +220,6 @@ class CompanionApp:
                 self.window.move(*target)
             self._placement_initialized = True
         return True
-
-    def _hide(self) -> None:
-        self.window.hide()
 
     def tick(self) -> bool:
         self.tick_count += 1
@@ -196,33 +232,28 @@ class CompanionApp:
             self.rollout = resolved_rollout
             self.reader.switch(self.rollout)
         snapshot = self.reader.poll() if self.rollout else None
-        if probe.thread_id is None:
-            self._set_status("TokenWatch: waiting for Codex CDP at 127.0.0.1:9222")
-            self._hide()
-            return True
-        if self.rollout is None:
-            self._set_status(f"TokenWatch: thread {probe.thread_id[:8]} has no unique rollout")
-            self._hide()
-            return True
-        if snapshot is None:
-            self._set_status("TokenWatch: selected rollout has no token usage yet")
-            self._hide()
-            return True
-        lines = render(snapshot)
+        work_snapshot = probe.thread_id is not None and self.rollout is not None and snapshot is not None
+        if snapshot is not None:
+            self._last_snapshot = snapshot
+        display_snapshot = snapshot or self._last_snapshot or _empty_snapshot()
+        if not work_snapshot:
+            # Keep rate limits from the last valid snapshot, but never claim
+            # that cache-hit data belongs to the current non-Work window.
+            display_snapshot = dataclasses.replace(display_snapshot, cache_available=False)
+        lines = render(display_snapshot)
         validate_layout(lines.splitlines())
         # Keep the visible layout pure text while using Pango only to emphasize
         # dynamic numbers.  Markup tags do not affect the monospace columns.
-        self.label.set_markup(render_markup(snapshot))
+        self.label.set_markup(render_markup(display_snapshot))
         parent = find_codex_window()
-        if parent is None:
-            self._set_status("TokenWatch: waiting for Codex X11 window")
-            self._hide()
-            return True
-        if parent.minimized:
-            self._set_status("TokenWatch: Codex is minimized")
-            self._hide()
-            return True
-        self._set_status(f"TokenWatch: connected to {probe.thread_id[:8]}")
+        if work_snapshot:
+            self._set_status(f"TokenWatch: connected to {probe.thread_id[:8]}")
+        elif probe.thread_id is None:
+            self._set_status("TokenWatch: Codex Work route unavailable; showing last quota and - cache placeholders")
+        elif self.rollout is None:
+            self._set_status(f"TokenWatch: thread {probe.thread_id[:8]} has no unique rollout; showing last quota")
+        else:
+            self._set_status("TokenWatch: selected rollout has no token usage yet; showing last quota")
         self._show_attached(parent)
         return True
 

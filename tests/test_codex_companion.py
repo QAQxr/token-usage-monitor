@@ -157,6 +157,20 @@ class CompanionDataTests(unittest.TestCase):
         self.assertIn('foreground="#111827"', markup)
         self.assertIn('weight="bold"', markup)
 
+    def test_non_work_view_uses_dash_for_cache_but_keeps_quota(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = write_rollout(Path(directory), A, 3892679)
+            snapshot = IncrementalRolloutReader().switch(path)
+
+        non_work = replace(snapshot, cache_available=False)
+        lines = render_lines(non_work)
+        self.assertIn("- HIT", lines[1])
+        self.assertIn("-", lines[6])
+        self.assertIn("-", lines[7])
+        self.assertIn("5h100.00%", lines[10])
+        self.assertIn("7d  2.00%", lines[10])
+        self.assertEqual(re.sub(r"<[^>]+>", "", render_markup(non_work)), render(non_work))
+
     def test_companion_instance_lock_rejects_a_second_process(self):
         with tempfile.TemporaryDirectory() as directory:
             previous = os.environ.get("XDG_RUNTIME_DIR")

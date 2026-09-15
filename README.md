@@ -2,7 +2,7 @@
 
 这是一个只面向 Ubuntu 22.04 + Codex GUI 的本地只读 TokenWatch MVP。
 
-它不会修改 Codex、`auth.json` 或 `~/.codex/sessions`，也不会联网。Codex 和 TokenWatch 可以分别启动；TokenWatch 只在同时发现 Codex GUI、loopback CDP 和当前 rollout 时显示窗口。
+它不会修改 Codex、`auth.json` 或 `~/.codex/sessions`，也不会联网。Codex 和 TokenWatch 可以分别启动；TokenWatch 窗口独立显示，Codex Work/CDP/rollout 只决定数据是否可更新。
 
 ## 当前实现
 
@@ -12,7 +12,8 @@
 - 第一次绑定全量读取，之后只读取 JSONL 新增字节；文件替换或 truncate 会安全重建。
 - `REQ` 定义为当前 rollout 中有效 `token_count` usage snapshot 数量。
 - GTK3 纯文字窗口，内容固定 12 行；正常态只替换数字和进度条。
-- X11 下首次显示时默认贴在 Codex 右侧；之后不再因 Codex 移动、缩放或最大化重新定位，用户拖到哪里就保持在哪里；窗口默认全局置顶，但只设置一次；最小化时隐藏。
+- X11 下首次显示时如果能找到 Codex，默认贴在右侧；之后不再因 Codex 移动、缩放、最大化或最小化重新定位，用户拖到哪里就保持在哪里；窗口默认全局置顶，但只设置一次。
+- 面板不会因 CDP、rollout 或 Codex X11 窗口暂时不可用而自动隐藏；没有当前 Work 快照时沿用最近一次限额，缓存命中位置显示 `-`。
 
 ## 启动
 
@@ -46,7 +47,7 @@ journalctl --user -u tokenwatch.service -f
 python3 -m tokenwatch --gui
 ```
 
-当 Codex 没有用 `--remote-debugging-address=127.0.0.1 --remote-debugging-port=9222` 启动时，窗口会保持隐藏。
+当 Codex 没有用 `--remote-debugging-address=127.0.0.1 --remote-debugging-port=9222` 启动时，窗口仍然显示，但只能保留最近一次限额，缓存命中位置显示 `-`。
 
 如果要让应用菜单里的 Codex 默认带上这些参数，可安装项目里的用户级启动包装器：
 
